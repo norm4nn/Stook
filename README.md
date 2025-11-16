@@ -1,6 +1,24 @@
-# Welcome to your Expo app 👋
+# Stook – tap-powered social graph
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Stook is a React Native / Expo concept that encourages people to meet in real life by “stooking” – tapping phones with NFC enabled. Every tap:
+
+- greets the other person with a custom alert,
+- shares only the profile links you choose (phone, LinkedIn, meme, anything),
+- sends back a snapshot of their contact graph so you can keep expanding your own network.
+
+Team: Szymon Mamoń (gr.1 Mon 13:15), Szczepan Rzeszutek (gr.5 Wed 11:30), Szymon Sadowski (gr.5 Wed 11:30).
+
+Use the new **Profile** tab in the app to:
+
+- toggle whether your Stook is discoverable,
+- edit what data gets shared,
+- reset the defaults before a meetup.
+
+From the **Home** tab you can preview those fields and trigger the NFC simulation button, which feeds packets into the background listener.
+
+---
+
+This is still an [Expo](https://expo.dev) project bootstrapped with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
 
