@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Stook",
+    "slug": "stook",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6200ee"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stook.app",
+      "infoPlist": {
+        "NFCReaderUsageDescription": "Stook potrzebuje dostępu do NFC aby wymieniać kontakty"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6200ee"
+      },
+      "permissions": [
+        "android.permission.NFC"
+      ],
+      "package": "com.stook.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+
+  }
+}
