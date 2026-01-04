@@ -23,6 +23,7 @@ type StookContextValue = {
   enqueueMockTap: () => void;
   latestPacket: NfcPacket | null;
   acknowledgePacket: (id: string) => void;
+  lastDeliveredPacket: NfcPacket | null;
 };
 
 const defaultShareables: Shareables = {
@@ -45,7 +46,21 @@ export function StookProvider({ children }: { children: React.ReactNode }) {
   const [isActive, setIsActive] = useState(true);
   const [shareables, setShareables] = useState<Shareables>(defaultShareables);
   const [latestPacket, setLatestPacket] = useState<NfcPacket | null>(null);
+  const [lastDeliveredPacket, setLastDeliveredPacket] = useState<NfcPacket | null>(null);
   const queueRef = useRef<NfcPacket[]>([]);
+
+  const flushQueue = useCallback(() => {
+    setLatestPacket((currentPacket) => {
+      if (currentPacket) {
+        return currentPacket;
+      }
+      const nextPacket = queueRef.current.shift();
+      if (!nextPacket) {
+        return currentPacket;
+      }
+      return nextPacket;
+    });
+  }, []);
 
   const toggleActive = (value?: boolean) => {
     setIsActive((prev) => {
@@ -67,28 +82,21 @@ export function StookProvider({ children }: { children: React.ReactNode }) {
 
   const enqueueMockTap = useCallback(() => {
     queueRef.current.push(buildPacket(shareables, isActive));
-  }, [shareables, isActive]);
+    flushQueue();
+  }, [shareables, isActive, flushQueue]);
 
   React.useEffect(() => {
     const interval = setInterval(() => {
-      setLatestPacket((currentPacket) => {
-        if (currentPacket) {
-          return currentPacket;
-        }
-        const nextPacket = queueRef.current.shift();
-        if (!nextPacket) {
-          return currentPacket;
-        }
-        return nextPacket;
-      });
-    }, 1000);
+      flushQueue();
+    }, 1500);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [flushQueue]);
 
   const acknowledgePacket = useCallback((id: string) => {
     setLatestPacket((packet) => {
       if (packet && packet.id === id) {
+        setLastDeliveredPacket(packet);
         return null;
       }
       return packet;
@@ -105,8 +113,9 @@ export function StookProvider({ children }: { children: React.ReactNode }) {
       enqueueMockTap,
       latestPacket,
       acknowledgePacket,
+      lastDeliveredPacket,
     }),
-    [isActive, shareables, latestPacket, enqueueMockTap, acknowledgePacket]
+    [isActive, shareables, latestPacket, enqueueMockTap, acknowledgePacket, lastDeliveredPacket]
   );
 
   return <StookContext.Provider value={value}>{children}</StookContext.Provider>;
