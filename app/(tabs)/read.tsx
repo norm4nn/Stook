@@ -1,4 +1,7 @@
-import { Alert, Button, View } from 'react-native';
+import { router } from 'expo-router';
+import React from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
+import { Button, Card, Paragraph, Title } from 'react-native-paper';
 import { db } from '../database';
 import { readNfc } from '../nfc';
 
@@ -38,9 +41,29 @@ export default function ReadScreen() {
     }
   };
 
-  return (
-    <View>
-      <Button title="Scan NFC tag" onPress={handleRead} />
+return (
+    <View style={styles.container}>
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title>Read NFC Tag</Title>
+          <Paragraph>Scan a tag to save its data to your device.</Paragraph>
+          <Button mode="contained" onPress={handleRead} style={styles.button}>
+            Scan NFC
+          </Button>
+          <Button mode="outlined" onPress={() => router.push('/write')} style={styles.button}>
+            Go to Write NFC
+          </Button>
+          <Button mode="outlined" onPress={() => router.push('/nfclist')} style={styles.button}>
+            Go to NFC List
+          </Button>
+        </Card.Content>
+      </Card>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: '#f7f7f7' },
+  card: { padding: 16 },
+  button: { marginVertical: 6 },
+});

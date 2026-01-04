@@ -13,6 +13,7 @@ export default function Layout() {
     <Tabs screenOptions={{ headerShown: true }}>
       <Tabs.Screen name="write" options={{ title: 'Write NFC' }} />
       <Tabs.Screen name="read" options={{ title: 'Read NFC' }} />
+      <Tabs.Screen name="nfclist" options={{ title: 'NFC List' }} />
     </Tabs>
   );
 }
