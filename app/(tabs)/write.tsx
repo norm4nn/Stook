@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { Button, Card, Paragraph, TextInput, Title } from "react-native-paper";
 import { db } from "../database";
@@ -15,12 +15,45 @@ function calculateBytes(payload: any): number {
 export default function WriteScreen() {
   const [friends, setFriends] = useState<any[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [ownerTagId, setOwnerTagId] = useState<string | null>(null);
+
+  const loadLocalProfile = async () => {
+  const rows = await db.getAllAsync<{
+    tag_id: string | null;
+    name: string;
+    surname: string;
+    phone: string;
+    links: string;
+    notes: string;
+  }>(`
+    SELECT tag_id, name, surname, phone, links, notes
+    FROM contacts
+    WHERE source = 'local'
+    ORDER BY createdAt DESC
+    LIMIT 1
+  `);
+
+  if (rows.length > 0) {
+    setOwnerTagId(rows[0].tag_id ?? null);
+
+    setForm({
+      name: rows[0].name ?? "",
+      surname: rows[0].surname ?? "",
+      phone: rows[0].phone ?? "",
+      links: rows[0].links ?? "",
+      notes: rows[0].notes ?? "",
+    });
+  }
+};
 
   useEffect(() => {
-    // Pobierz tylko kontakty, które już mają tag_id (czyli zapisane NFC)
+    // friends with NFC tags
     db.getAllAsync(
       "SELECT tag_id, name, surname FROM contacts WHERE tag_id IS NOT NULL",
     ).then(setFriends);
+
+    // load local profile into form
+    loadLocalProfile();
   }, []);
 
   const [form, setForm] = useState({
@@ -147,7 +180,9 @@ export default function WriteScreen() {
           />
 
           <Title style={{ marginTop: 16 }}>Share friends</Title>
-          {friends.map((f) => (
+          {friends
+            .filter((f) => f.tag_id !== ownerTagId)
+            .map((f) => (
             <Button
               key={f.tag_id}
               mode={selected.includes(f.tag_id) ? "contained" : "outlined"}

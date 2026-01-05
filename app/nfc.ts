@@ -1,10 +1,6 @@
 import { Platform } from "react-native";
 import NfcManager, { Ndef, NfcTech } from "react-native-nfc-manager";
 
-const log = (...args: any[]) => console.log("[NFC]", ...args);
-const warn = (...args: any[]) => console.warn("[NFC]", ...args);
-const error = (...args: any[]) => console.error("[NFC]", ...args);
-
 export async function initNFC() {
   if (Platform.OS !== "android" && Platform.OS !== "ios") {
     console.warn("[NFC] Skipping NFC init (unsupported platform)");
