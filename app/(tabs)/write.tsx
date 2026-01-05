@@ -17,10 +17,12 @@ export default function WriteScreen() {
   const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
+    // Pobierz tylko kontakty, które już mają tag_id (czyli zapisane NFC)
     db.getAllAsync(
       "SELECT tag_id, name, surname FROM contacts WHERE tag_id IS NOT NULL",
     ).then(setFriends);
   }, []);
+
   const [form, setForm] = useState({
     name: "",
     surname: "",
@@ -29,7 +31,8 @@ export default function WriteScreen() {
     notes: "",
   });
 
-  const saveToDB = async (tagId: string | null): Promise<void> => {
+  // Funkcja zapisująca dopiero gdy mamy prawdziwy tag_id z NFC
+  const saveToDB = async (tagId: string): Promise<void> => {
     const stmt = await db.prepareAsync(`
       INSERT INTO contacts (
         tag_id, name, surname, phone, links, notes, source, createdAt
@@ -53,6 +56,7 @@ export default function WriteScreen() {
   };
 
   const handleWrite = async () => {
+    // Przygotuj payload w pamięci
     const payload = {
       type: "profile",
       owner: form,
@@ -66,14 +70,24 @@ export default function WriteScreen() {
     };
 
     const size = calculateBytes(payload);
-    if (size > 716) {
+    if (size > MAX_BYTES) {
       Alert.alert("Error", "Too much data for NFC tag");
       return;
     }
 
     try {
+      // Zapis na NFC
       const tagId = await writeNfc(payload);
+      console.log("Tag ID:", tagId);
+
+      // TYLKO jeśli mamy prawdziwy tagId zapisujemy do bazy
+      if (!tagId) {
+        Alert.alert("Error", "NFC tag returned no ID");
+        return;
+      }
+
       await saveToDB(tagId);
+
       Alert.alert("Success", "Written to NFC");
     } catch (e) {
       console.error(e);
@@ -104,14 +118,12 @@ export default function WriteScreen() {
             onChangeText={(v) => setForm({ ...form, name: v })}
             style={styles.input}
           />
-
           <TextInput
             label="Surname"
             value={form.surname}
             onChangeText={(v) => setForm({ ...form, surname: v })}
             style={styles.input}
           />
-
           <TextInput
             label="Phone"
             value={form.phone}
@@ -119,14 +131,12 @@ export default function WriteScreen() {
             keyboardType="phone-pad"
             style={styles.input}
           />
-
           <TextInput
             label="Links"
             value={form.links}
             onChangeText={(v) => setForm({ ...form, links: v })}
             style={styles.input}
           />
-
           <TextInput
             label="Notes"
             value={form.notes}
@@ -137,7 +147,6 @@ export default function WriteScreen() {
           />
 
           <Title style={{ marginTop: 16 }}>Share friends</Title>
-
           {friends.map((f) => (
             <Button
               key={f.tag_id}
@@ -158,7 +167,6 @@ export default function WriteScreen() {
           <Paragraph>
             NFC usage: {usedBytes} / {MAX_BYTES} bytes
           </Paragraph>
-
           {usedBytes > MAX_BYTES && (
             <Paragraph style={{ color: "red" }}>
               Payload too large for NFC tag
@@ -168,7 +176,6 @@ export default function WriteScreen() {
           <Button mode="contained" onPress={handleWrite} style={styles.button}>
             Write to NFC
           </Button>
-
           <Button
             mode="outlined"
             onPress={() => router.push("/read")}
@@ -176,7 +183,6 @@ export default function WriteScreen() {
           >
             Go to Read NFC
           </Button>
-
           <Button
             mode="outlined"
             onPress={() => router.push("/nfclist")}
@@ -197,13 +203,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#f7f7f7",
   },
-  card: {
-    padding: 16,
-  },
-  input: {
-    marginTop: 8,
-  },
-  button: {
-    marginTop: 12,
-  },
+  card: { padding: 16 },
+  input: { marginTop: 8 },
+  button: { marginTop: 12 },
 });

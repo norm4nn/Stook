@@ -10,39 +10,77 @@ export default function ReadScreen() {
     const data = await readNfc();
     if (!data || data.type !== "profile") return;
 
-    // zapis ownera
-    await db.runAsync(
-      `INSERT OR IGNORE INTO contacts
-       (tag_id, name, surname, phone, links, notes, source, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        data.owner.tag_id,
-        data.owner.name,
-        data.owner.surname,
-        data.owner.phone,
-        data.owner.links,
-        data.owner.notes,
-        "nfc",
-        new Date().toISOString(),
-      ],
-    );
+    try {
+      const ownTag = await db.getFirstAsync(
+        `SELECT tag_id FROM contacts WHERE tag_id = ? AND source = 'local'`,
+        [data.owner.tag_id],
+      );
 
-    for (const f of data.friends) {
+      if (ownTag) {
+        Alert.alert(
+          "This is your tag",
+          "You are scanning an NFC tag created on this device.",
+        );
+        return;
+      }
+
+      await db.execAsync("BEGIN");
+
       await db.runAsync(
-        `INSERT INTO shared_contacts
-         (tag_id, name, surname, from_tag_id, createdAt)
-         VALUES (?, ?, ?, ?, ?)`,
+        `
+        INSERT INTO contacts (
+          tag_id, name, surname, phone, links, notes, source, createdAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(tag_id) DO UPDATE SET
+          name = excluded.name,
+          surname = excluded.surname,
+          phone = excluded.phone,
+          links = excluded.links,
+          notes = excluded.notes,
+          source = excluded.source
+        `,
         [
-          f.tag_id,
-          f.name,
-          f.surname,
           data.owner.tag_id,
+          data.owner.name,
+          data.owner.surname,
+          data.owner.phone,
+          data.owner.links,
+          data.owner.notes,
+          "nfc",
           new Date().toISOString(),
         ],
       );
-    }
 
-    Alert.alert("Success", "Profile and friends saved");
+      for (const f of data.friends) {
+        await db.runAsync(
+          `
+          INSERT INTO shared_contacts (
+            from_tag_id, tag_id, name, surname, createdAt
+          )
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(from_tag_id, tag_id) DO UPDATE SET
+            name = excluded.name,
+            surname = excluded.surname
+          `,
+          [
+            data.owner.tag_id,
+            f.tag_id,
+            f.name,
+            f.surname,
+            new Date().toISOString(),
+          ],
+        );
+      }
+
+      await db.execAsync("COMMIT");
+
+      Alert.alert("Success", "Profile and friends saved");
+    } catch (e) {
+      await db.execAsync("ROLLBACK");
+      console.error(e);
+      Alert.alert("Error", "Failed to save NFC data");
+    }
   };
 
   return (
