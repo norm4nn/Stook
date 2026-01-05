@@ -34,7 +34,7 @@ export default function WriteScreen() {
   // Funkcja zapisująca dopiero gdy mamy prawdziwy tag_id z NFC
   const saveToDB = async (tagId: string): Promise<void> => {
     const stmt = await db.prepareAsync(`
-      INSERT INTO contacts (
+      INSERT OR REPLACE INTO contacts (
         tag_id, name, surname, phone, links, notes, source, createdAt
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
