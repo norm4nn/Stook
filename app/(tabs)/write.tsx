@@ -1,34 +1,50 @@
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { Button, Card, Paragraph, TextInput, Title } from 'react-native-paper';
-import { db } from '../database';
-import { writeNfc } from '../nfc';
+import { router } from "expo-router";
+import React, { useState, useEffect } from "react";
+import { Alert, StyleSheet, View } from "react-native";
+import { Button, Card, Paragraph, TextInput, Title } from "react-native-paper";
+import { db } from "../database";
+import { writeNfc } from "../nfc";
+
+const MAX_BYTES = 716;
+
+function calculateBytes(payload: any): number {
+  const json = JSON.stringify(payload);
+  return new TextEncoder().encode(json).length;
+}
 
 export default function WriteScreen() {
+  const [friends, setFriends] = useState<any[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+
+  useEffect(() => {
+    db.getAllAsync(
+      "SELECT tag_id, name, surname FROM contacts WHERE tag_id IS NOT NULL",
+    ).then(setFriends);
+  }, []);
   const [form, setForm] = useState({
-    name: '',
-    surname: '',
-    phone: '',
-    links: '',
-    notes: '',
+    name: "",
+    surname: "",
+    phone: "",
+    links: "",
+    notes: "",
   });
 
-  const saveToDB = async () => {
+  const saveToDB = async (tagId: string | null): Promise<void> => {
     const stmt = await db.prepareAsync(`
       INSERT INTO contacts (
-        name, surname, phone, links, notes, source, createdAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        tag_id, name, surname, phone, links, notes, source, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
       await stmt.executeAsync([
+        tagId,
         form.name,
         form.surname,
         form.phone,
         form.links,
         form.notes,
-        'local',
+        "local",
         new Date().toISOString(),
       ]);
     } finally {
@@ -37,41 +53,69 @@ export default function WriteScreen() {
   };
 
   const handleWrite = async () => {
+    const payload = {
+      type: "profile",
+      owner: form,
+      friends: friends
+        .filter((f) => selected.includes(f.tag_id))
+        .map((f) => ({
+          tag_id: f.tag_id,
+          name: f.name,
+          surname: f.surname,
+        })),
+    };
+
+    const size = calculateBytes(payload);
+    if (size > 716) {
+      Alert.alert("Error", "Too much data for NFC tag");
+      return;
+    }
+
     try {
-      await writeNfc(form);
-      await saveToDB();
-      Alert.alert('Success', 'Data written to NFC and saved locally');
+      const tagId = await writeNfc(payload);
+      await saveToDB(tagId);
+      Alert.alert("Success", "Written to NFC");
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to write NFC tag');
+      Alert.alert("Error", "NFC write failed");
     }
   };
+
+  const payloadPreview = {
+    type: "profile",
+    owner: form,
+    friends: friends.filter((f) => selected.includes(f.tag_id)),
+  };
+
+  const usedBytes = calculateBytes(payloadPreview);
 
   return (
     <View style={styles.container}>
       <Card style={styles.card}>
         <Card.Content>
           <Title>Write NFC Tag</Title>
-          <Paragraph>Fill in the details and write them to an NFC tag.</Paragraph>
+          <Paragraph>
+            Fill in the details and write them to an NFC tag.
+          </Paragraph>
 
           <TextInput
             label="Name"
             value={form.name}
-            onChangeText={v => setForm({ ...form, name: v })}
+            onChangeText={(v) => setForm({ ...form, name: v })}
             style={styles.input}
           />
 
           <TextInput
             label="Surname"
             value={form.surname}
-            onChangeText={v => setForm({ ...form, surname: v })}
+            onChangeText={(v) => setForm({ ...form, surname: v })}
             style={styles.input}
           />
 
           <TextInput
             label="Phone"
             value={form.phone}
-            onChangeText={v => setForm({ ...form, phone: v })}
+            onChangeText={(v) => setForm({ ...form, phone: v })}
             keyboardType="phone-pad"
             style={styles.input}
           />
@@ -79,30 +123,55 @@ export default function WriteScreen() {
           <TextInput
             label="Links"
             value={form.links}
-            onChangeText={v => setForm({ ...form, links: v })}
+            onChangeText={(v) => setForm({ ...form, links: v })}
             style={styles.input}
           />
 
           <TextInput
             label="Notes"
             value={form.notes}
-            onChangeText={v => setForm({ ...form, notes: v })}
+            onChangeText={(v) => setForm({ ...form, notes: v })}
             multiline
             numberOfLines={3}
             style={styles.input}
           />
 
-          <Button
-            mode="contained"
-            onPress={handleWrite}
-            style={styles.button}
-          >
+          <Title style={{ marginTop: 16 }}>Share friends</Title>
+
+          {friends.map((f) => (
+            <Button
+              key={f.tag_id}
+              mode={selected.includes(f.tag_id) ? "contained" : "outlined"}
+              style={{ marginTop: 6 }}
+              onPress={() =>
+                setSelected((prev) =>
+                  prev.includes(f.tag_id)
+                    ? prev.filter((id) => id !== f.tag_id)
+                    : [...prev, f.tag_id],
+                )
+              }
+            >
+              {f.name} {f.surname}
+            </Button>
+          ))}
+
+          <Paragraph>
+            NFC usage: {usedBytes} / {MAX_BYTES} bytes
+          </Paragraph>
+
+          {usedBytes > MAX_BYTES && (
+            <Paragraph style={{ color: "red" }}>
+              Payload too large for NFC tag
+            </Paragraph>
+          )}
+
+          <Button mode="contained" onPress={handleWrite} style={styles.button}>
             Write to NFC
           </Button>
 
           <Button
             mode="outlined"
-            onPress={() => router.push('/read')}
+            onPress={() => router.push("/read")}
             style={styles.button}
           >
             Go to Read NFC
@@ -110,7 +179,7 @@ export default function WriteScreen() {
 
           <Button
             mode="outlined"
-            onPress={() => router.push('/nfclist')}
+            onPress={() => router.push("/nfclist")}
             style={styles.button}
           >
             Go to NFC List
@@ -124,9 +193,9 @@ export default function WriteScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: 16,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: "#f7f7f7",
   },
   card: {
     padding: 16,

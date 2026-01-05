@@ -1,47 +1,51 @@
-import { router } from 'expo-router';
-import React from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { Button, Card, Paragraph, Title } from 'react-native-paper';
-import { db } from '../database';
-import { readNfc } from '../nfc';
+import { router } from "expo-router";
+import React from "react";
+import { Alert, StyleSheet, View } from "react-native";
+import { Button, Card, Paragraph, Title } from "react-native-paper";
+import { db } from "../database";
+import { readNfc } from "../nfc";
 
 export default function ReadScreen() {
   const handleRead = async () => {
-    try {
-      const data = await readNfc();
-      if (!data) {
-        Alert.alert('No data', 'No NFC data found');
-        return;
-      }
+    const data = await readNfc();
+    if (!data || data.type !== "profile") return;
 
-      const stmt = await db.prepareAsync(`
-        INSERT INTO contacts (
-          name, surname, phone, links, notes, source, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
+    // zapis ownera
+    await db.runAsync(
+      `INSERT OR IGNORE INTO contacts
+       (tag_id, name, surname, phone, links, notes, source, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.owner.tag_id,
+        data.owner.name,
+        data.owner.surname,
+        data.owner.phone,
+        data.owner.links,
+        data.owner.notes,
+        "nfc",
+        new Date().toISOString(),
+      ],
+    );
 
-      try {
-        await stmt.executeAsync([
-          data.name ?? '',
-          data.surname ?? '',
-          data.phone ?? '',
-          data.links ?? '',
-          data.notes ?? '',
-          'nfc',
+    for (const f of data.friends) {
+      await db.runAsync(
+        `INSERT INTO shared_contacts
+         (tag_id, name, surname, from_tag_id, createdAt)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          f.tag_id,
+          f.name,
+          f.surname,
+          data.owner.tag_id,
           new Date().toISOString(),
-        ]);
-      } finally {
-        await stmt.finalizeAsync();
-      }
-
-      Alert.alert('Success', 'Data saved from NFC');
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Failed to read NFC');
+        ],
+      );
     }
+
+    Alert.alert("Success", "Profile and friends saved");
   };
 
-return (
+  return (
     <View style={styles.container}>
       <Card style={styles.card}>
         <Card.Content>
@@ -50,10 +54,18 @@ return (
           <Button mode="contained" onPress={handleRead} style={styles.button}>
             Scan NFC
           </Button>
-          <Button mode="outlined" onPress={() => router.push('/write')} style={styles.button}>
+          <Button
+            mode="outlined"
+            onPress={() => router.push("/write")}
+            style={styles.button}
+          >
             Go to Write NFC
           </Button>
-          <Button mode="outlined" onPress={() => router.push('/nfclist')} style={styles.button}>
+          <Button
+            mode="outlined"
+            onPress={() => router.push("/nfclist")}
+            style={styles.button}
+          >
             Go to NFC List
           </Button>
         </Card.Content>
@@ -63,7 +75,12 @@ return (
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: '#f7f7f7' },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 16,
+    backgroundColor: "#f7f7f7",
+  },
   card: { padding: 16 },
   button: { marginVertical: 6 },
 });
