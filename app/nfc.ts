@@ -24,58 +24,72 @@ export async function initNFC() {
   }
 }
 
-export async function writeNfc(data: any): Promise<string | null> {
+export async function writeNfc(data: any): Promise<string> {
   const json = JSON.stringify(data);
   const bytes = Ndef.encodeMessage([Ndef.textRecord(json)]);
 
-  let tagId: string | null = null;
-
   try {
     await NfcManager.requestTechnology(NfcTech.Ndef);
+
     const tag = await NfcManager.getTag();
-    tagId = tag?.id ?? null;
+    const tagId = tag?.id;
+    if (!tagId) {
+      throw new Error("NFC tag has no ID");
+    }
+
     await NfcManager.ndefHandler.writeNdefMessage(bytes);
+    return tagId;
   } finally {
     await NfcManager.cancelTechnologyRequest();
   }
-
-  return tagId;
 }
 
 export async function readNfc(): Promise<any> {
-  log("readNfc called");
+  console.log("readNfc called");
 
   try {
-    log("Requesting NDEF technology...");
+    console.log("Requesting NDEF technology...");
     await NfcManager.requestTechnology(NfcTech.Ndef);
-    log("NDEF technology acquired");
+    console.log("NDEF technology acquired");
 
-    log("Reading NFC tag...");
+    console.log("Reading NFC tag...");
     const tag = await NfcManager.getTag();
-    log("Raw tag object:", tag);
+    console.log("Raw tag object:", tag);
 
-    const record = tag?.ndefMessage?.[0];
-    if (!record?.payload) {
-      warn("No NDEF payload found on tag");
+    if (!tag) {
+      console.warn("No tag detected");
       return null;
     }
 
-    log("Raw payload bytes:", record.payload);
+    // Pobierz pierwszy rekord NDEF
+    const record = tag.ndefMessage?.[0];
+    if (!record?.payload) {
+      console.warn("No NDEF payload found on tag");
+      return null;
+    }
 
+    console.log("Raw payload bytes:", record.payload);
+
+    // Dekodowanie payloadu
     const payloadBytes = Uint8Array.from(record.payload);
+    // Pomijamy pierwsze 3 bajty (status byte + lang code) dla tekstu
     const payloadText = Ndef.text.decodePayload(payloadBytes);
 
-    log("Decoded text payload:", payloadText);
+    console.log("Decoded text payload:", payloadText);
 
     const parsed = JSON.parse(payloadText);
-    log("Parsed JSON object:", parsed);
+    console.log("Parsed JSON object:", parsed);
+
+    // Dodaj tag_id z fizycznego tagu
+    parsed.owner = parsed.owner || {};
+    parsed.owner.tag_id = tag.id;
 
     return parsed;
   } catch (e) {
-    error("Error during NFC read", e);
+    console.error("Error during NFC read", e);
     throw e;
   } finally {
-    log("Releasing NFC technology");
+    console.log("Releasing NFC technology");
     await NfcManager.cancelTechnologyRequest();
   }
 }

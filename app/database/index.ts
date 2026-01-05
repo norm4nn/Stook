@@ -5,8 +5,7 @@ export const db = SQLite.openDatabaseSync("nfc.db");
 export const initDB = () => {
   db.execSync(`
     CREATE TABLE IF NOT EXISTS contacts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tag_id TEXT UNIQUE,
+      tag_id TEXT PRIMARY KEY,
       name TEXT,
       surname TEXT,
       phone TEXT,
@@ -17,12 +16,14 @@ export const initDB = () => {
     );
 
     CREATE TABLE IF NOT EXISTS shared_contacts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_tag_id TEXT,
       tag_id TEXT,
       name TEXT,
       surname TEXT,
-      from_tag_id TEXT,
-      createdAt TEXT
+      createdAt TEXT,
+      PRIMARY KEY (from_tag_id, tag_id),
+      FOREIGN KEY (from_tag_id) REFERENCES contacts(tag_id),
+      FOREIGN KEY (tag_id) REFERENCES contacts(tag_id)
     );
   `);
 };
