@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { Button, Card, Paragraph, TextInput, Title } from "react-native-paper";
 import { db } from "../database";
@@ -46,15 +46,20 @@ export default function WriteScreen() {
   }
 };
 
-  useEffect(() => {
-    // friends with NFC tags
-    db.getAllAsync(
-      "SELECT tag_id, name, surname FROM contacts WHERE tag_id IS NOT NULL",
-    ).then(setFriends);
+  useFocusEffect(
+  useCallback(() => {
+    const load = async () => {
+      const rows = await db.getAllAsync(
+        "SELECT tag_id, name, surname FROM contacts WHERE tag_id IS NOT NULL",
+      );
+      setFriends(rows);
 
-    // load local profile into form
-    loadLocalProfile();
-  }, []);
+      await loadLocalProfile();
+    };
+
+    load();
+  }, [])
+);
 
   const [form, setForm] = useState({
     name: "",
