@@ -1,9 +1,9 @@
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { Button, Card, Paragraph, TextInput, Title } from "react-native-paper";
-import { db } from "../database";
-import { writeNfc } from "../nfc";
+import { db } from "../../lib/database";
+import { writeNfc } from "../../lib/nfc";
 
 const MAX_BYTES = 716;
 
@@ -215,20 +215,6 @@ export default function WriteScreen() {
 
           <Button mode="contained" onPress={handleWrite} style={styles.button}>
             Write to NFC
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={() => router.push("/read")}
-            style={styles.button}
-          >
-            Go to Read NFC
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={() => router.push("/nfclist")}
-            style={styles.button}
-          >
-            Go to NFC List
           </Button>
         </Card.Content>
       </Card>
