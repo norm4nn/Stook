@@ -1,9 +1,8 @@
-import { router } from "expo-router";
 import React from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { Button, Card, Paragraph, Title } from "react-native-paper";
-import { db } from "../database";
-import { readNfc } from "../nfc";
+import { db } from "../../lib/database";
+import { readNfc } from "../../lib/nfc";
 
 export default function ReadScreen() {
   const handleRead = async () => {
@@ -91,20 +90,6 @@ export default function ReadScreen() {
           <Paragraph>Scan a tag to save its data to your device.</Paragraph>
           <Button mode="contained" onPress={handleRead} style={styles.button}>
             Scan NFC
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={() => router.push("/write")}
-            style={styles.button}
-          >
-            Go to Write NFC
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={() => router.push("/nfclist")}
-            style={styles.button}
-          >
-            Go to NFC List
           </Button>
         </Card.Content>
       </Card>
