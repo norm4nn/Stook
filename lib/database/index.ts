@@ -12,7 +12,10 @@ export const initDB = () => {
       links TEXT,
       notes TEXT,
       source TEXT,
-      createdAt TEXT
+      createdAt TEXT,
+
+      stook_count INTEGER NOT NULL DEFAULT 0,
+      last_stooked_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS shared_contacts (
