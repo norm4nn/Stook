@@ -5,6 +5,17 @@ import { db } from "../../lib/database";
 import { readNfc } from "../../lib/nfc";
 
 export default function ReadScreen() {
+
+  const toDay = (iso: string) => iso.slice(0, 16); // YYYY-MM-DD
+
+  const canStook = (
+    lastStookedAt: string | null,
+    now: string
+  ): boolean => {
+    if (!lastStookedAt) return true;
+    return toDay(lastStookedAt) < toDay(now);
+  };
+
   const handleRead = async () => {
     const data = await readNfc();
     if (!data || data.type !== "profile") return;
@@ -23,21 +34,52 @@ export default function ReadScreen() {
         return;
       }
 
+      const now = new Date().toISOString();
+
+      const existing = await db.getFirstAsync<{
+        stook_count: number | null;
+        last_stooked_at: string | null;
+      }>(
+        `
+        SELECT stook_count, last_stooked_at
+        FROM contacts
+        WHERE tag_id = ?
+        `,
+        [data.owner.tag_id]
+      );
+
+      let stookCount = existing?.stook_count ?? 0;
+
+      if (canStook(existing?.last_stooked_at ?? null, now)) {
+        stookCount += 1;
+      }
+
       await db.execAsync("BEGIN");
 
       await db.runAsync(
         `
         INSERT INTO contacts (
-          tag_id, name, surname, phone, links, notes, source, createdAt
+          tag_id,
+          name,
+          surname,
+          phone,
+          links,
+          notes,
+          source,
+          createdAt,
+          stook_count,
+          last_stooked_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(tag_id) DO UPDATE SET
           name = excluded.name,
           surname = excluded.surname,
           phone = excluded.phone,
           links = excluded.links,
           notes = excluded.notes,
-          source = excluded.source
+          source = excluded.source,
+          stook_count = excluded.stook_count,
+          last_stooked_at = excluded.last_stooked_at
         `,
         [
           data.owner.tag_id,
@@ -47,9 +89,11 @@ export default function ReadScreen() {
           data.owner.links,
           data.owner.notes,
           "nfc",
-          new Date().toISOString(),
-        ],
-      );
+          now,
+          stookCount,
+          now,
+        ]
+        );
 
       for (const f of data.friends) {
         await db.runAsync(

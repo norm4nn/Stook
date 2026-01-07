@@ -13,6 +13,9 @@ type Contact = {
   notes: string;
   source: string;
   createdAt: string;
+
+  stook_count?: number;
+  last_stooked_at?: string;
 };
 
 type SharedContact = {
@@ -33,6 +36,32 @@ export default function NfcListScreen() {
       loadData();
     }, [])
   );
+
+  const daysAgo = (iso: string): number => {
+    const now = new Date();
+    const then = new Date(iso);
+
+    const nowDay = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate()
+    );
+    const thenDay = Date.UTC(
+      then.getUTCFullYear(),
+      then.getUTCMonth(),
+      then.getUTCDate()
+    );
+
+    return Math.floor((nowDay - thenDay) / (1000 * 60 * 60 * 24));
+  };
+
+  const lastStookedLabel = (iso: string): string => {
+    const d = daysAgo(iso);
+
+    if (d === 0) return "today 🙂";
+    if (d === 1) return "yesterday";
+    return `${d} days ago`;
+  };
 
   const loadData = async () => {
     try {
@@ -89,9 +118,23 @@ export default function NfcListScreen() {
         {item.links ? <Paragraph>{item.links}</Paragraph> : null}
         {item.notes ? <Paragraph>{item.notes}</Paragraph> : null}
 
-        <Paragraph style={styles.date}>
-          {new Date(item.createdAt).toLocaleString()}
-        </Paragraph>
+        {
+          item.stook_count ?
+          <Paragraph style={styles.stook}>
+            Stooks: <Text style={styles.stookValue}>{item.stook_count}</Text>
+          </Paragraph> : null
+        }
+
+        {
+          item.last_stooked_at ? 
+          <Paragraph style={styles.stook}>
+            Last stooked{" "}
+            <Text style={styles.stookValue}>
+              {lastStookedLabel(item.last_stooked_at)}
+            </Text>
+          </Paragraph> : null
+        }
+
 
         {item.friends && item.friends.length > 0 && (
           <View style={styles.friendsContainer}>
@@ -200,5 +243,15 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 8,
     paddingBottom: 8,
+  },
+    stook: {
+    marginTop: 2,
+    marginBottom: 6,
+    color: "#555",
+    fontSize: 13,
+  },
+  stookValue: {
+    fontWeight: "600",
+    color: "#007AFF",
   },
 });
