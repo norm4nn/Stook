@@ -1,3 +1,4 @@
+import { Audio } from "expo-av";
 import React from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { Button, Card, Paragraph, Title } from "react-native-paper";
@@ -5,8 +6,9 @@ import { db } from "../../lib/database";
 import { readNfc } from "../../lib/nfc";
 
 export default function ReadScreen() {
+  const [sound, setSound] = React.useState<Audio.Sound | null>(null);
 
-  const toDay = (iso: string) => iso.slice(0, 16); // YYYY-MM-DD
+  const toDay = (iso: string) => iso.slice(0, 10); // YYYY-MM-DD
 
   const canStook = (
     lastStookedAt: string | null,
@@ -16,20 +18,41 @@ export default function ReadScreen() {
     return toDay(lastStookedAt) < toDay(now);
   };
 
+  React.useEffect(() => {
+    let mounted = true;
+
+    const loadSound = async () => {
+      const { sound } = await Audio.Sound.createAsync(
+        require("../../assets/audio/fart.mp3"),
+        { shouldPlay: false }
+      );
+      if (mounted) setSound(sound);
+    };
+
+    loadSound();
+
+    return () => {
+      mounted = false;
+      sound?.unloadAsync();
+    };
+  }, []);
+
   const handleRead = async () => {
-    const data = await readNfc();
-    if (!data || data.type !== "profile") return;
+    let transactionStarted = false;
 
     try {
+      const data = await readNfc();
+      if (!data || data.type !== "profile") return;
+
       const ownTag = await db.getFirstAsync(
         `SELECT tag_id FROM contacts WHERE tag_id = ? AND source = 'local'`,
-        [data.owner.tag_id],
+        [data.owner.tag_id]
       );
 
       if (ownTag) {
         Alert.alert(
           "This is your tag",
-          "You are scanning an NFC tag created on this device.",
+          "You are scanning an NFC tag created on this device."
         );
         return;
       }
@@ -49,26 +72,18 @@ export default function ReadScreen() {
       );
 
       let stookCount = existing?.stook_count ?? 0;
-
       if (canStook(existing?.last_stooked_at ?? null, now)) {
         stookCount += 1;
       }
 
       await db.execAsync("BEGIN");
+      transactionStarted = true;
 
       await db.runAsync(
         `
         INSERT INTO contacts (
-          tag_id,
-          name,
-          surname,
-          phone,
-          links,
-          notes,
-          source,
-          createdAt,
-          stook_count,
-          last_stooked_at
+          tag_id, name, surname, phone, links, notes,
+          source, createdAt, stook_count, last_stooked_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(tag_id) DO UPDATE SET
@@ -93,7 +108,7 @@ export default function ReadScreen() {
           stookCount,
           now,
         ]
-        );
+      );
 
       for (const f of data.friends) {
         await db.runAsync(
@@ -111,16 +126,21 @@ export default function ReadScreen() {
             f.tag_id,
             f.name,
             f.surname,
-            new Date().toISOString(),
-          ],
+            now,
+          ]
         );
       }
 
       await db.execAsync("COMMIT");
-
+      transactionStarted = false;
+      if (sound) {
+        await sound.replayAsync();
+      }
       Alert.alert("Success", "Profile and friends saved");
     } catch (e) {
-      await db.execAsync("ROLLBACK");
+      if (transactionStarted) {
+        await db.execAsync("ROLLBACK");
+      }
       console.error(e);
       Alert.alert("Error", "Failed to save NFC data");
     }
