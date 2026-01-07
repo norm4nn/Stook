@@ -59,6 +59,19 @@ export default function TabLayout() {
           ),
         }}
       />
+        <Tabs.Screen
+          name="graph"
+          options={{
+            title: "Graph",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons
+                name="graphql"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
     </Tabs>
   );
 }
