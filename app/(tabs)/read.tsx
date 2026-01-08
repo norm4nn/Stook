@@ -1,35 +1,60 @@
 import { Audio } from "expo-av";
-import React from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, Alert } from "react-native";
 import { Button, Card, Paragraph, Title } from "react-native-paper";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "../../lib/database";
 import { readNfc } from "../../lib/nfc";
 
+const ASSET_AUDIO = require("../../assets/audio/fart.mp3");
+
 export default function ReadScreen() {
-  const [sound, setSound] = React.useState<Audio.Sound | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
 
-  const toDay = (iso: string) => iso.slice(0, 10); // YYYY-MM-DD
+  const toDay = (iso: string) => iso.slice(0, 10);
 
-  const canStook = (
-    lastStookedAt: string | null,
-    now: string
-  ): boolean => {
+  const canStook = (lastStookedAt: string | null, now: string) => {
     if (!lastStookedAt) return true;
     return toDay(lastStookedAt) < toDay(now);
   };
 
-  React.useEffect(() => {
+  const loadCurrentSound = async (): Promise<Audio.Sound> => {
+    if (sound) await sound.unloadAsync();
+
+    let stored = await AsyncStorage.getItem("currentNfcSound");
+    let parsed: { uri: string; isAsset?: boolean } | null = null;
+    if (stored) {
+      try {
+        parsed = JSON.parse(stored);
+      } catch {
+        parsed = { uri: stored, isAsset: false };
+      }
+    }
+
+    let newSound: Audio.Sound;
+
+    if (!parsed) {
+      ({ sound: newSound } = await Audio.Sound.createAsync(ASSET_AUDIO));
+    } else if (parsed.isAsset) {
+      ({ sound: newSound } = await Audio.Sound.createAsync(parsed.uri));
+    } else {
+      try {
+        ({ sound: newSound } = await Audio.Sound.createAsync({
+          uri: parsed.uri,
+        }));
+      } catch {
+        ({ sound: newSound } = await Audio.Sound.createAsync(ASSET_AUDIO));
+      }
+    }
+
+    setSound(newSound);
+    return newSound;
+  };
+
+  useEffect(() => {
     let mounted = true;
 
-    const loadSound = async () => {
-      const { sound } = await Audio.Sound.createAsync(
-        require("../../assets/audio/fart.mp3"),
-        { shouldPlay: false }
-      );
-      if (mounted) setSound(sound);
-    };
-
-    loadSound();
+    loadCurrentSound().catch(console.error);
 
     return () => {
       mounted = false;
@@ -37,22 +62,22 @@ export default function ReadScreen() {
     };
   }, []);
 
+  // Obsługa skanowania NFC
   const handleRead = async () => {
     let transactionStarted = false;
-
     try {
       const data = await readNfc();
       if (!data || data.type !== "profile") return;
 
       const ownTag = await db.getFirstAsync(
         `SELECT tag_id FROM contacts WHERE tag_id = ? AND source = 'local'`,
-        [data.owner.tag_id]
+        [data.owner.tag_id],
       );
 
       if (ownTag) {
         Alert.alert(
           "This is your tag",
-          "You are scanning an NFC tag created on this device."
+          "You are scanning an NFC tag created on this device.",
         );
         return;
       }
@@ -67,8 +92,8 @@ export default function ReadScreen() {
         SELECT stook_count, last_stooked_at
         FROM contacts
         WHERE tag_id = ?
-        `,
-        [data.owner.tag_id]
+      `,
+        [data.owner.tag_id],
       );
 
       let stookCount = existing?.stook_count ?? 0;
@@ -95,7 +120,7 @@ export default function ReadScreen() {
           source = excluded.source,
           stook_count = excluded.stook_count,
           last_stooked_at = excluded.last_stooked_at
-        `,
+      `,
         [
           data.owner.tag_id,
           data.owner.name,
@@ -107,7 +132,7 @@ export default function ReadScreen() {
           now,
           stookCount,
           now,
-        ]
+        ],
       );
 
       for (const f of data.friends) {
@@ -120,27 +145,20 @@ export default function ReadScreen() {
           ON CONFLICT(from_tag_id, tag_id) DO UPDATE SET
             name = excluded.name,
             surname = excluded.surname
-          `,
-          [
-            data.owner.tag_id,
-            f.tag_id,
-            f.name,
-            f.surname,
-            now,
-          ]
+        `,
+          [data.owner.tag_id, f.tag_id, f.name, f.surname, now],
         );
       }
 
       await db.execAsync("COMMIT");
       transactionStarted = false;
-      if (sound) {
-        await sound.replayAsync();
-      }
+
+      const currentSound = await loadCurrentSound();
+      await currentSound.replayAsync();
+
       Alert.alert("Success", "Profile and friends saved");
     } catch (e) {
-      if (transactionStarted) {
-        await db.execAsync("ROLLBACK");
-      }
+      if (transactionStarted) await db.execAsync("ROLLBACK");
       console.error(e);
       Alert.alert("Error", "Failed to save NFC data");
     }

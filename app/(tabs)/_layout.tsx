@@ -59,19 +59,28 @@ export default function TabLayout() {
           ),
         }}
       />
-        <Tabs.Screen
-          name="graph"
-          options={{
-            title: "Graph",
-            tabBarIcon: ({ color, size }) => (
-              <MaterialCommunityIcons
-                name="graphql"
-                color={color}
-                size={size}
-              />
-            ),
-          }}
-        />
+      <Tabs.Screen
+        name="graph"
+        options={{
+          title: "Graph",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="graphql" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="record_sound"
+        options={{
+          title: "Record sound",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="microphone"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
